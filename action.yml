@@ -14,6 +14,9 @@ inputs:
   config_file:
     description: Location of the config JSON file
     required: false
+  ref:
+    description: Custom ref
+    required: false
 outputs:
   changelog:
     description: Generated changelog for the latest tag
