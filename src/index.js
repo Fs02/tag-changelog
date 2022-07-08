@@ -34,22 +34,23 @@ async function run() {
   const configFile = getInput("config_file", { required: false });
   const config = getConfig(configFile);
   const excludeTypesString = getInput("exclude_types", { required: false }) || "";
+  const ref = getInput("ref") || "tags";
 
   if (excludeTypesString) {
     config.excludeTypes = excludeTypesString.split(",");
   }
 
   // Find the two most recent tags
-  const { data: tags } = await octokit.repos.listTags({
-    owner,
-    repo,
-    per_page: 10,
+  const { data: refs } = await octokit.request("GET /repos/{owner}/{repo}/git/matching-refs/{ref}", {
+    owner: owner,
+    repo: repo,
+    ref: ref,
   });
 
-  const validSortedTags = tags
-    .filter((t) => compareVersions.validate(t.name))
+  const validSortedTags = refs
+    .filter((t) => compareVersions.validate(t.ref.replace("refs/tags/", "")))
     .sort((a, b) => {
-      return compareVersions(a.name, b.name);
+      return compareVersions(a.ref.replace("refs/tags/", ""), b.ref.replace("refs/tags/", ""));
     })
     .reverse();
 
@@ -62,8 +63,8 @@ async function run() {
   const result = await octokit.repos.compareCommits({
     owner,
     repo,
-    base: validSortedTags[1].commit.sha,
-    head: validSortedTags[0].commit.sha,
+    base: validSortedTags[1].object.sha,
+    head: validSortedTags[0].object.sha,
   });
 
   const fetchUserFunc = async function (pullNumber) {
@@ -99,7 +100,7 @@ async function run() {
     return;
   }
 
-  const log = generateChangelog(validSortedTags[0].name, commitObjects, config);
+  const log = generateChangelog(validSortedTags[0].ref.replace("refs/tags/", ""), commitObjects, config);
 
   info(log.changelog);
   setOutput("changelog", log.changelog);
